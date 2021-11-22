@@ -1,0 +1,14 @@
+version = 0.1
+[default]
+[default.pipeline_bootstrap]
+[default.pipeline_bootstrap.parameters]
+pipeline_user = "arn:aws:iam::091550601287:user/aws-sam-cli-managed-mystage-pipeline-PipelineUser-1HVZW2A6KQSD"
+
+[mystage]
+[mystage.pipeline_bootstrap]
+[mystage.pipeline_bootstrap.parameters]
+pipeline_execution_role = "arn:aws:iam::091550601287:role/aws-sam-cli-managed-mystage-PipelineExecutionRole-DKTAPTJJBRTS"
+cloudformation_execution_role = "arn:aws:iam::091550601287:role/aws-sam-cli-managed-mysta-CloudFormationExecutionR-1KRUM3YHF484W"
+artifacts_bucket = "aws-sam-cli-managed-mystage-pipel-artifactsbucket-1iaj6hf6gp8dm"
+image_repository = "091550601287.dkr.ecr.us-west-2.amazonaws.com/aws-sam-cli-managed-mystage-pipeline-resources-imagerepository-bssz0zhnxhhu"
+region = "us-west-2"
