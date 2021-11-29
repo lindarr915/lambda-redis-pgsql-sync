@@ -6,12 +6,20 @@ using System.Threading.Tasks;
 using Amazon.Lambda.APIGatewayEvents;
 using Amazon.Lambda.Core;
 
+using System;
+using System.Linq;
+using pgsql_client.Models;
+using StackExchange.Redis;
+using Newtonsoft.Json;
+
+
 // Assembly attribute to enable the Lambda function's JSON input to be converted into a .NET class.
 [assembly: LambdaSerializer(typeof(Amazon.Lambda.Serialization.SystemTextJson.DefaultLambdaJsonSerializer))]
 
 namespace HelloWorld
 {
-
+        
+    
     public class Function
     {
 
@@ -30,6 +38,53 @@ namespace HelloWorld
         public async Task<APIGatewayProxyResponse> FunctionHandler(APIGatewayProxyRequest apigProxyEvent, ILambdaContext context)
         {
 
+            Console.WriteLine("Starting Redis Connection...");
+            IDatabase cache = RedisConnectorHelper.Connection.GetDatabase();
+            Console.WriteLine("Starting PostgreSQL connection...");
+
+            using (var db = new postgresContext())
+            {
+                // Note: This sample requires the database to be created before running.
+
+                // Create
+                Console.WriteLine("Inserting a new Product");
+                db.Add(new Product
+                {
+                    ProductName = "iPhone 13",
+                    Description = "Your new superpower.",
+                    Price = 500,
+                    QuantityInStock = 100
+                });
+                db.SaveChanges();
+
+                // Read
+                Console.WriteLine("Querying for a Product");
+                var Product = db.Products
+                    .OrderBy(b => b.ProductId)
+                    .First();
+
+                cache.StringSet("Product:" + Product.ProductId ,JsonConvert.SerializeObject(Product));
+            }
+            using (var db = new postgresContext()){
+
+                var ProductFromCache = JsonConvert.DeserializeObject<Product>(cache.StringGet("Product:2"));
+
+                Console.WriteLine(JsonConvert.SerializeObject(ProductFromCache));
+
+                // Update
+                Console.WriteLine("Updating the Product");
+                ProductFromCache.Price = 2000;
+                db.Update(ProductFromCache);
+                db.SaveChanges();
+
+                // Delete
+                // Console.WriteLine("Delete the Product");
+                // db.Remove(Product);
+                // db.SaveChanges();
+            }
+
+            Console.WriteLine("After main...");
+
             var location = await GetCallingIP();
             var body = new Dictionary<string, string>
             {
@@ -39,10 +94,12 @@ namespace HelloWorld
 
             return new APIGatewayProxyResponse
             {
-                Body = JsonSerializer.Serialize(body),
+                Body = System.Text.Json.JsonSerializer.Serialize(body),
                 StatusCode = 200,
                 Headers = new Dictionary<string, string> { { "Content-Type", "application/json" } }
             };
         }
+
+        
     }
 }

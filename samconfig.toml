@@ -1,0 +1,11 @@
+version = 0.1
+[default]
+[default.deploy]
+[default.deploy.parameters]
+stack_name = "helloredis-app"
+s3_bucket = "aws-sam-cli-managed-default-samclisourcebucket-1wt1hrjatp83o"
+s3_prefix = "helloredis-app"
+region = "us-west-2"
+confirm_changeset = true
+capabilities = "CAPABILITY_IAM"
+image_repositories = ["HelloWorldFunction=091550601287.dkr.ecr.us-west-2.amazonaws.com/helloredisappc1b2d1f6/helloworldfunction19d43fc4repo"]

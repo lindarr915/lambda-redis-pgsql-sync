@@ -8,13 +8,14 @@ RUN apt-get update && apt-get -y install zip
 
 RUN mkdir $FUNCTION_DIR
 WORKDIR $FUNCTION_DIR
-COPY Function.cs HelloWorld.csproj aws-lambda-tools-defaults.json $FUNCTION_DIR/
+COPY Function.cs RedisConnectorHelper.cs HelloWorld.csproj aws-lambda-tools-defaults.json ./Models/postgresContext.cs $FUNCTION_DIR/
 RUN dotnet tool install -g Amazon.Lambda.Tools
 
 # Build and Copy artifacts depending on build mode.
 RUN mkdir -p build_artifacts
+
 RUN if [ "$SAM_BUILD_MODE" = "debug" ]; then dotnet lambda package --configuration Debug; else dotnet lambda package --configuration Release; fi
-RUN if [ "$SAM_BUILD_MODE" = "debug" ]; then cp -r /build/bin/Debug/net5.0/publish/* /build/build_artifacts; else cp -r /build/bin/Release/net5.0/publish/* /build/build_artifacts; fi
+RUN if [ "$SAM_BUILD_MODE" = "debug" ]; then cp -r /build/bin/Debug/net5.0/publish/* /build/build_artifacts /p:GenerateRuntimeConfigurationFiles=true; else cp -r /build/bin/Release/net5.0/publish/* /build/build_artifacts; fi
 
 FROM public.ecr.aws/lambda/dotnet:5.0
 
