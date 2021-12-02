@@ -5,7 +5,7 @@ Description: 'Sample SAM Template for hello-redis
   '
 Globals:
   Function:
-    Timeout: 10
+    Timeout: 60
 Parameters:
   vpcStackName:
     Default: rds-mysql-vpc
@@ -19,6 +19,7 @@ Resources:
   HelloWorldFunction:
     Type: AWS::Serverless::Function
     Properties:
+      MemorySize: 256
       Environment:
         Variables:
           DB_HOST: database-1.cluster-cyeqog6cufmf.us-west-2.rds.amazonaws.com

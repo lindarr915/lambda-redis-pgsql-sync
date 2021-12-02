@@ -18,34 +18,31 @@ using Newtonsoft.Json;
 
 namespace HelloWorld
 {
-        
-    
+
+
     public class Function
     {
 
         private static readonly HttpClient client = new HttpClient();
+        private static readonly IDatabase cache = RedisConnectorHelper.Connection.GetDatabase();
 
         private static async Task<string> GetCallingIP()
         {
             client.DefaultRequestHeaders.Accept.Clear();
             client.DefaultRequestHeaders.Add("User-Agent", "AWS Lambda .Net Client");
 
-            var msg = await client.GetStringAsync("http://checkip.amazonaws.com/").ConfigureAwait(continueOnCapturedContext:false);
+            var msg = await client.GetStringAsync("http://checkip.amazonaws.com/").ConfigureAwait(continueOnCapturedContext: false);
 
-            return msg.Replace("\n","");
+            return msg.Replace("\n", "");
         }
 
         public async Task<APIGatewayProxyResponse> FunctionHandler(APIGatewayProxyRequest apigProxyEvent, ILambdaContext context)
         {
 
-            Console.WriteLine("Starting Redis Connection...");
-            IDatabase cache = RedisConnectorHelper.Connection.GetDatabase();
-            Console.WriteLine("Starting PostgreSQL connection...");
 
-            using (var db = new postgresContext())
+            using (postgresContext db = new postgresContext())
             {
                 // Note: This sample requires the database to be created before running.
-
                 // Create
                 Console.WriteLine("Inserting a new Product");
                 db.Add(new Product
@@ -57,16 +54,19 @@ namespace HelloWorld
                 });
                 db.SaveChanges();
 
+
                 // Read
                 Console.WriteLine("Querying for a Product");
                 var Product = db.Products
                     .OrderBy(b => b.ProductId)
                     .First();
 
-                cache.StringSet("Product:" + Product.ProductId ,JsonConvert.SerializeObject(Product));
+                cache.StringSet("Product:" + Product.ProductId, JsonConvert.SerializeObject(Product));
             }
-            using (var db = new postgresContext()){
 
+            using (postgresContext db = new postgresContext())
+            {
+                // Reading object from Redis cache
                 var ProductFromCache = JsonConvert.DeserializeObject<Product>(cache.StringGet("Product:2"));
 
                 Console.WriteLine(JsonConvert.SerializeObject(ProductFromCache));
@@ -76,30 +76,28 @@ namespace HelloWorld
                 ProductFromCache.Price = 2000;
                 db.Update(ProductFromCache);
                 db.SaveChanges();
-
-                // Delete
-                // Console.WriteLine("Delete the Product");
-                // db.Remove(Product);
-                // db.SaveChanges();
             }
+            // Delete
+            // Console.WriteLine("Delete the Product");
+            // db.Remove(Product);
+            // db.SaveChanges();
 
-            Console.WriteLine("After main...");
 
-            var location = await GetCallingIP();
-            var body = new Dictionary<string, string>
-            {
-                { "message", "hello world" },
-                { "location", location }
-            };
+            // var location = await GetCallingIP();
+            // var body = new Dictionary<string, string>
+            // {
+            // { "message", "hello world" },
+            // { "location", location }
+            // };
 
             return new APIGatewayProxyResponse
             {
-                Body = System.Text.Json.JsonSerializer.Serialize(body),
+                Body = String.Empty,
                 StatusCode = 200,
                 Headers = new Dictionary<string, string> { { "Content-Type", "application/json" } }
             };
         }
 
-        
+
     }
 }
