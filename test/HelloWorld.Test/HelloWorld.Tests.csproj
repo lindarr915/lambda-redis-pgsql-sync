@@ -2,6 +2,7 @@
 
   <PropertyGroup>
     <TargetFramework>net5.0</TargetFramework>
+    <PublishReadyToRun>true</PublishReadyToRun>
   </PropertyGroup>
 
   <ItemGroup>
@@ -16,5 +17,4 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\HelloWorld\HelloWorld.csproj" />
   </ItemGroup>
-
 </Project>

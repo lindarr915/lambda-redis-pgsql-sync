@@ -21,4 +21,4 @@ FROM public.ecr.aws/lambda/dotnet:5.0
 
 COPY --from=build-image /build/build_artifacts/ /var/task/
 # Command can be overwritten by providing a different command in the template directly.
-CMD ["HelloWorld::HelloWorld.Function::FunctionHandler"]
+CMD ["HelloWorld::HelloWorld.Function::TracingFunctionHandler"]

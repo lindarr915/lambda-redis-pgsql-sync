@@ -19,11 +19,11 @@ Parameters:
     Type: String
 
 Resources:
+
   HelloWorldFunction:
     Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
-
     Properties:
-      MemorySize: 256
+      MemorySize: 512
       Environment:
         Variables:
           DB_HOST: database-1.cluster-cyeqog6cufmf.us-west-2.rds.amazonaws.com
@@ -35,12 +35,21 @@ Resources:
         SubnetIds: 
           - subnet-c1b2809a
       PackageType: Image
+      Tracing: Active
       Events:
         HelloWorld:
           Type: Api # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
           Properties:
             Path: /hello
             Method: get
+        CWSchedule:
+          Type: Schedule
+          Properties:
+            Schedule: 'rate(15 minutes)'
+            Name: TestSchedule
+            Description: test schedule
+            Enabled: true
+
     Metadata:
       DockerTag: dotnet5.0-v1
       DockerContext: ./src/HelloWorld

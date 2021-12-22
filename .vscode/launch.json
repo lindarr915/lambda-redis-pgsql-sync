@@ -1,22 +1,22 @@
 {
-    "version": "0.2.0",
     "configurations": [
-
         {
-            "name": ".NET Core Launch (console)",
-            "type": "coreclr",
-            "request": "launch",
-            "preLaunchTask": "build",
-            "program": "${workspaceFolder}/test/HelloWorld.Test/bin/Debug/net5.0/HelloWorld.Tests.dll",
-            "args": [],
-            "cwd": "${workspaceFolder}/test/HelloWorld.Test",
-            "console": "internalConsole",
-            "stopAtEntry": false
+            "type": "aws-sam",
+            "request": "direct-invoke",
+            "name": "hello-redis:HelloWorldFunction",
+            "invokeTarget": {
+                "target": "template",
+                "templatePath": "${workspaceFolder}/template.yaml",
+                "logicalId": "HelloWorldFunction"
+            },
+            "lambda": {
+                "payload": {},
+                "environmentVariables": {
+                    "DB_PASSWORD": "Uudaew2eiyua8thei2wo"
+                },
+                "runtime": "dotnet5.0"
+            }
         },
-        {
-            "name": ".NET Core Attach",
-            "type": "coreclr",
-            "request": "attach"
-        }
+
     ]
 }

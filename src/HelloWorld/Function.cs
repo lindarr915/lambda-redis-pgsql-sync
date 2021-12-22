@@ -12,6 +12,12 @@ using pgsql_client.Models;
 using StackExchange.Redis;
 using Newtonsoft.Json;
 
+using OpenTelemetry.Trace;
+using OpenTelemetry;
+using Amazon.S3;
+
+using OpenTelemetry.Contrib.Instrumentation.AWSLambda.Implementation;
+
 
 // Assembly attribute to enable the Lambda function's JSON input to be converted into a .NET class.
 [assembly: LambdaSerializer(typeof(Amazon.Lambda.Serialization.SystemTextJson.DefaultLambdaJsonSerializer))]
@@ -19,12 +25,12 @@ using Newtonsoft.Json;
 namespace HelloWorld
 {
 
-
     public class Function
     {
 
         private static readonly HttpClient client = new HttpClient();
-        private static readonly IDatabase cache = RedisConnectorHelper.Connection.GetDatabase();
+        private static IDatabase cache;
+        private postgresContext db;
 
         private static async Task<string> GetCallingIP()
         {
@@ -36,14 +42,42 @@ namespace HelloWorld
             return msg.Replace("\n", "");
         }
 
-        public async Task<APIGatewayProxyResponse> FunctionHandler(APIGatewayProxyRequest apigProxyEvent, ILambdaContext context)
+        public Function()
         {
+            db = new postgresContext();
+            cache = RedisConnectorHelper.Connection.GetDatabase();
+        }
 
+        TracerProvider tracerProvider = Sdk.CreateTracerProviderBuilder()
+         // add other instrumentations
+         .AddXRayTraceId()
+         .AddOtlpExporter()
+         .AddAWSInstrumentation()
+         .AddAWSLambdaConfigurations()
+         .AddEntityFrameworkCoreInstrumentation()
+         .AddRedisInstrumentation(RedisConnectorHelper.Connection, options => options.SetVerboseDatabaseStatements = true)
+         .Build();
 
-            using (postgresContext db = new postgresContext())
+        // new Lambda function handler passed in
+        public async Task<APIGatewayProxyResponse> TracingFunctionHandler(APIGatewayProxyRequest input, ILambdaContext context)
+        =>  await AWSLambdaWrapper.Trace(tracerProvider, FunctionHandler, input, context);
+
+        // TODO: Get the popular product ID from external source
+        static HashSet<int> firstRecordsToSyncIds = new HashSet<int>(){
+            6,7,8,9,10
+        };
+
+        static HashSet<int> secondRecordsToSyncIds = new HashSet<int>(){
+            6,7,8,9,10
+
+        };
+        async public Task<APIGatewayProxyResponse> FunctionHandler(APIGatewayProxyRequest apigProxyEvent, ILambdaContext context)
+        {
             {
+
                 // Note: This sample requires the database to be created before running.
                 // Create
+                /*
                 Console.WriteLine("Inserting a new Product");
                 db.Add(new Product
                 {
@@ -52,43 +86,49 @@ namespace HelloWorld
                     Price = 500,
                     QuantityInStock = 100
                 });
-                db.SaveChanges();
+                await db.SaveChangesAsync();
+                */
 
-
-                // Read
+                // Read record from database and save to cache
                 Console.WriteLine("Querying for a Product");
-                var Product = db.Products
-                    .OrderBy(b => b.ProductId)
-                    .First();
+                var items = db.Products.Where(b => firstRecordsToSyncIds.Contains(b.ProductId));
+                var WriteToRedisTasks = new List<Task<bool>>();
 
-                cache.StringSet("Product:" + Product.ProductId, JsonConvert.SerializeObject(Product));
+                foreach (var item in items)
+                {
+                    WriteToRedisTasks.Add( 
+                        cache.StringSetAsync("Product:" + item.ProductId, JsonConvert.SerializeObject(item))
+                    );
+                    Console.WriteLine(String.Format("Write Product:{0} to Redis", item.ProductId));
+                }
+                await Task.WhenAll(WriteToRedisTasks);    
+
+                db.ChangeTracker.Clear();
+
             }
 
-            using (postgresContext db = new postgresContext())
             {
                 // Reading object from Redis cache
-                var ProductFromCache = JsonConvert.DeserializeObject<Product>(cache.StringGet("Product:2"));
+                foreach (var record in secondRecordsToSyncIds)
+                {
+                    var ProductFromCache = JsonConvert.DeserializeObject<Product>(
+                        await cache.StringGetAsync(String.Format("Product:{0}",record.ToString())));
+                    // Console.WriteLine(JsonConvert.SerializeObject(ProductFromCache));
+                    Console.WriteLine(String.Format("Write Product:{0} to Database", ProductFromCache.ProductId));
 
-                Console.WriteLine(JsonConvert.SerializeObject(ProductFromCache));
+                    db.Update(ProductFromCache);
+                }
+                await db.SaveChangesAsync();
 
                 // Update
-                Console.WriteLine("Updating the Product");
-                ProductFromCache.Price = 2000;
-                db.Update(ProductFromCache);
-                db.SaveChanges();
+                Console.WriteLine("Hello World");
             }
+
             // Delete
             // Console.WriteLine("Delete the Product");
             // db.Remove(Product);
             // db.SaveChanges();
 
-
-            // var location = await GetCallingIP();
-            // var body = new Dictionary<string, string>
-            // {
-            // { "message", "hello world" },
-            // { "location", location }
-            // };
 
             return new APIGatewayProxyResponse
             {

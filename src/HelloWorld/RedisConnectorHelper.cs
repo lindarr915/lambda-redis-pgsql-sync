@@ -1,8 +1,7 @@
 using System;
-using System.Linq;
-using pgsql_client.Models;
 using StackExchange.Redis;
-using Newtonsoft.Json;
+using OpenTelemetry;
+using OpenTelemetry.Trace;
 
 namespace HelloWorld
 {
@@ -16,6 +15,7 @@ namespace HelloWorld
             {
                 var connection = ConnectionMultiplexer.Connect(cacheConnection);
                 return connection;
+
             });
         }
 

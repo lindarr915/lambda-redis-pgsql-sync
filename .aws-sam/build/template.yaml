@@ -19,7 +19,7 @@ Resources:
   HelloWorldFunction:
     Type: AWS::Serverless::Function
     Properties:
-      MemorySize: 256
+      MemorySize: 512
       Environment:
         Variables:
           DB_HOST: database-1.cluster-cyeqog6cufmf.us-west-2.rds.amazonaws.com
@@ -32,12 +32,20 @@ Resources:
         SubnetIds:
         - subnet-c1b2809a
       PackageType: Image
+      Tracing: Active
       Events:
         HelloWorld:
           Type: Api
           Properties:
             Path: /hello
             Method: get
+        CWSchedule:
+          Type: Schedule
+          Properties:
+            Schedule: rate(15 minutes)
+            Name: TestSchedule
+            Description: test schedule
+            Enabled: true
       ImageUri: helloworldfunction:dotnet5.0-v1
     Metadata:
       DockerTag: dotnet5.0-v1
