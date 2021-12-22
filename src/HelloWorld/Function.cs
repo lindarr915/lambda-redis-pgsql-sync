@@ -50,6 +50,7 @@ namespace HelloWorld
 
         TracerProvider tracerProvider = Sdk.CreateTracerProviderBuilder()
          // add other instrumentations
+         //  TODO: Use OpenTelemetery in Lambda and .NET 
          .AddXRayTraceId()
          .AddOtlpExporter()
          .AddAWSInstrumentation()
@@ -60,9 +61,10 @@ namespace HelloWorld
 
         // new Lambda function handler passed in
         public async Task<APIGatewayProxyResponse> TracingFunctionHandler(APIGatewayProxyRequest input, ILambdaContext context)
-        =>  await AWSLambdaWrapper.Trace(tracerProvider, FunctionHandler, input, context);
+        => await AWSLambdaWrapper.Trace(tracerProvider, FunctionHandler, input, context);
 
         // TODO: Get the popular product ID from external source
+        // TODO: Seed better data sources
         static HashSet<int> firstRecordsToSyncIds = new HashSet<int>(){
             6,7,8,9,10
         };
@@ -96,12 +98,12 @@ namespace HelloWorld
 
                 foreach (var item in items)
                 {
-                    WriteToRedisTasks.Add( 
+                    WriteToRedisTasks.Add(
                         cache.StringSetAsync("Product:" + item.ProductId, JsonConvert.SerializeObject(item))
                     );
                     Console.WriteLine(String.Format("Write Product:{0} to Redis", item.ProductId));
                 }
-                await Task.WhenAll(WriteToRedisTasks);    
+                await Task.WhenAll(WriteToRedisTasks);
 
                 db.ChangeTracker.Clear();
 
@@ -109,19 +111,22 @@ namespace HelloWorld
 
             {
                 // Reading object from Redis cache
-                foreach (var record in secondRecordsToSyncIds)
+                Parallel.ForEach(secondRecordsToSyncIds, async (record) => 
                 {
                     var ProductFromCache = JsonConvert.DeserializeObject<Product>(
-                        await cache.StringGetAsync(String.Format("Product:{0}",record.ToString())));
+                        await cache.StringGetAsync(String.Format("Product:{0}", record.ToString())));
                     // Console.WriteLine(JsonConvert.SerializeObject(ProductFromCache));
                     Console.WriteLine(String.Format("Write Product:{0} to Database", ProductFromCache.ProductId));
 
                     db.Update(ProductFromCache);
-                }
-                await db.SaveChangesAsync();
 
+                }
+                );
+
+
+            
+                var numOfRecordsUpdates = await db.SaveChangesAsync();
                 // Update
-                Console.WriteLine("Hello World");
             }
 
             // Delete
