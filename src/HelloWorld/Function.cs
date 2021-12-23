@@ -73,10 +73,24 @@ namespace HelloWorld
             20,21,22,23,24,25,26,27
 
         };
+
+        internal void IntializeData()
+        {
+            var p = db.Products.Where(b => b.ProductId == 11).Single();
+            p.ProductName = "iPhone 12";
+            p.Description ="Blast past fast.";
+            p.Price=500;
+            p.QuantityInStock=100;
+
+            db.Update(p);
+            db.SaveChanges();
+        }
+
+
         async public Task<APIGatewayProxyResponse> FunctionHandler(APIGatewayProxyRequest apigProxyEvent, ILambdaContext context)
         {
             {
-
+                IntializeData();
                 // Note: This sample requires the database to be created before running.
                 // Create
                 /*

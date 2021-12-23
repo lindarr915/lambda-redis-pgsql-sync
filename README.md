@@ -88,9 +88,23 @@ REPORT RequestId: 3e6c3770-fa77-4b58-a762-ed397a25f696	Duration: 3841.56 ms	Bill
 
 ```
 
+### Questions
+
+#### 1. Why store the .NET Object as JSON String in Redis? 
+- It is generic. It is possible to customize based on the business requirement. 
+- For example, if `QuantityInStock` is updated very frequently, you can use patterns such as `"Product:12:QuantityInStock` so that doing decrement operations will be faster. 
+- On the other hand, if the table has 50 columns, it might not be practical to use such naming pattern for all columns, i.e. `Product:12:ProductName`, `Product:12:Description`, `Product:12:ImageUrl`, `Product:12:Dimension`... etc. If is it designed that way, getting a record from cache will need making 50 `GET` calls instead of single one. 
+
+#### 2. Why call the Lambda function on every 15 min and the watched set instead of watching the changes on Redis and Database?  
+- Watching the changes on the Redis: It is possible to use a long running Redis client using subscribe to PubSub channels. (
+https://aws.amazon.com/tw/premiumsupport/knowledge-center/elasticache-redis-keyspace-notifications/)
+- If we have one long running client to watch the Pub/Sub Channel, it is not reliable. If the client (or underlying infra) failed, the key space message from Redis is lost. To avoid missing the message, two or more long running clients will be required.  
+- On the other hand, it might not be desired for our use cases. For example, the `QuantityInStock` field for a popular item is updated 200 times per second. It is not reasonable to replay the 200 req/sec to database server.  
+- If we don't accept stale or outdated data for any reason, the client should request data from redis - the authoritative data source (source of the record) instead. 
+- If the data in Redis does change frequently, say records is updated once per day, we would not choose to have one or two (for HA purpose) long running compute resource to connect with Redis and listen to change stream.    
 
 ### Performance Considerations
-
+- How about 1 millions records to update? 
 
 
 ### TODO

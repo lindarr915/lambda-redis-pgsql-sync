@@ -106,6 +106,9 @@ $RECYCLE.BIN/
 *.msm
 *.msp
 
+# Hack
+hack 
+
 # Windows shortcuts
 *.lnk
 
