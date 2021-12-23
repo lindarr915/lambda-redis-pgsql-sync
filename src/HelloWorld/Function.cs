@@ -111,6 +111,7 @@ namespace HelloWorld
 
             {
                 // Reading object from Redis cache
+                /*
                 Parallel.ForEach(secondRecordsToSyncIds, async (record) => 
                 {
                     var ProductFromCache = JsonConvert.DeserializeObject<Product>(
@@ -122,9 +123,19 @@ namespace HelloWorld
 
                 }
                 );
+                */
 
+                // db.ChangeTracker.Clear();
 
-            
+                foreach (var record in secondRecordsToSyncIds)
+                {
+                    var ProductFromCache = JsonConvert.DeserializeObject<Product>(
+                        await cache.StringGetAsync(String.Format("Product:{0}", record.ToString())));
+                    // Console.WriteLine(JsonConvert.SerializeObject(ProductFromCache));
+                    Console.WriteLine(String.Format("Write Product:{0} to Database", ProductFromCache.ProductId));
+
+                    db.Update(ProductFromCache);
+                }
                 var numOfRecordsUpdates = await db.SaveChangesAsync();
                 // Update
             }

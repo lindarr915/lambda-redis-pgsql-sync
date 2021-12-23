@@ -15,7 +15,7 @@ RUN dotnet tool install -g Amazon.Lambda.Tools
 RUN mkdir -p build_artifacts
 
 RUN if [ "$SAM_BUILD_MODE" = "debug" ]; then dotnet lambda package --configuration Debug; else dotnet lambda package --configuration Release; fi
-RUN if [ "$SAM_BUILD_MODE" = "debug" ]; then cp -r /build/bin/Debug/net5.0/publish/* /build/build_artifacts /p:GenerateRuntimeConfigurationFiles=true; else cp -r /build/bin/Release/net5.0/publish/* /build/build_artifacts; fi
+RUN if [ "$SAM_BUILD_MODE" = "debug" ]; then cp -r /build/bin/Debug/net5.0/publish/* /build/build_artifacts; else cp -r /build/bin/Release/net5.0/publish/* /build/build_artifacts; fi
 
 FROM public.ecr.aws/lambda/dotnet:5.0
 
