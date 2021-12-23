@@ -1,4 +1,109 @@
-# hello-redis
+# Database and Cache Synchronization 
+
+## Summary
+This is a proof of concept to demostrate that you can run *StackExchange.Redis* .NET Core in Lambda Functions 
+to connecting to Amazon ElastiCache and Amazon RDS and write the data from one source to another. 
+
+## Architecture
+
+We are going to run .NET Redis clients on AWS Lambda. The Lambda Function will be invoked by Amazon EventBridge on a schedule, say, every 15 minutes. During the invocation, the lambda function will read "watched" items, and copy the data from the database to cache. 
+
+![](images/ecache-n-rds.drawio.png)
+
+- Watched Items: Currently it is defined in the code. You can define the watched items in some external source, and read the set in the Lambda Function. 
+
+- We use EntityFrameworkCore to read the data from the database. Records read from database will be worked as .NET objects. To store the data into Redis, we define "Product:<ID>" as the key and the value is the Serialized JSON string. 
+
+### Reading data from Amazon ElastiCache and Overwrite data to Amazon RDS 
+
+#### Before Invoking Lambda, QuantityInStock is 3000 in Database and 2000 in Redis
+```
+➜  psql -h $DB_ENDPIINT -U postgres -d postgres -c "SELECT * FROM \"Products\" WHERE  \"ProductId\" = 22"
+
+ ProductId | ProductName |     Description      | QuantityInStock | Price 
+-----------+-------------+----------------------+-----------------+-------
+        22 | iPhone 13   | Your new superpower. |            3000 |   500
+(1 row)
+➜  redis-cli -h $REDIS_ENDPOINT -c GET "Product:22" | jq 
+
+{
+  "ProductId": 22,
+  "ProductName": "iPhone 13",
+  "Description": "Your new superpower.",
+  "QuantityInStock": 2000,
+  "Price": 500
+}
+```
+#### Invoking Lambda 
+```Invocation result for arn:aws:lambda:us-west-2:091550601287:function:helloredis-app-HelloWorldFunction-SfgLy8RyVqVt
+Logs:
+START RequestId: 3e6c3770-fa77-4b58-a762-ed397a25f696 Version: $LATEST
+END RequestId: 3e6c3770-fa77-4b58-a762-ed397a25f696
+REPORT RequestId: 3e6c3770-fa77-4b58-a762-ed397a25f696	Duration: 3841.56 ms	Billed Duration: 4419 ms	Memory Size: 512 MB	Max Memory Used: 136 MB	Init Duration: 576.89 ms	
+```
+#### After Invoking Lambda, QuantityInStock is 2000 in Database and Redis
+```
+➜  hello-redis git:(master) ✗ psql -h $DB_ENDPIINT -U postgres -d postgres -c "SELECT * FROM \"Products\" WHERE  \"ProductId\" = 22"
+
+ ProductId | ProductName |     Description      | QuantityInStock | Price 
+-----------+-------------+----------------------+-----------------+-------
+        22 | iPhone 13   | Your new superpower. |            2000 |   500
+
+```
+
+### Reading data from Amazon RDS and Overwrite data to Amazon ElastiCache 
+
+#### Before Invoking Lambda, Price is 400 in Database and 500 in Redis
+```
+➜  psql -h $DB_ENDPIINT -U postgres -d postgres -c "SELECT * FROM \"Products\" WHERE  \"ProductId\" = 11"
+
+ ProductId | ProductName |     Description      | QuantityInStock | Price 
+-----------+-------------+----------------------+-----------------+-------
+        11 | iPhone 12   | Blast past fast.     |             100 |   400
+(1 row)
+➜  redis-cli -h $REDIS_ENDPOINT -c GET "Product:11" | jq 
+
+{
+  "ProductId": 11,
+  "ProductName": "iPhone 12",
+  "Description": "Blast past fast.",
+  "QuantityInStock": 100,
+  "Price": 500
+}
+```
+#### Invoking Lambda 
+```Invocation result for arn:aws:lambda:us-west-2:091550601287:function:helloredis-app-HelloWorldFunction-SfgLy8RyVqVt
+```
+#### After Invoking Lambda, Price is 400 in Redis
+```
+➜  redis-cli -h $REDIS_ENDPOINT -c GET "Product:11" | jq 
+
+{
+  "ProductId": 11,
+  "ProductName": "iPhone 12",
+  "Description": "Blast past fast.",
+  "QuantityInStock": 100,
+  "Price": 400
+}
+
+```
+
+
+### Performance Considerations
+
+
+
+### TODO
+
+It is possible to observe the latancy of Redis and Database Connection using OpenTelemetry.
+
+### SAM CLI provided templates
+
+The information below is provided by AWS SAM CLI. However in the proof of concept we are not using APIGateway or events, and the input is hard-code in the source. s 
+
+supports Redis Cluster Mode Enabled.
+supports reading data from Read Replicaas.
+supports data types such as String, Hashes, Lists, Set, SortSet
 
 This project contains source code and supporting files for a serverless application that you can deploy with the SAM CLI. It includes the following files and folders.
 

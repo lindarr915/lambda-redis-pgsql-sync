@@ -66,11 +66,11 @@ namespace HelloWorld
         // TODO: Get the popular product ID from external source
         // TODO: Seed better data sources
         static HashSet<int> firstRecordsToSyncIds = new HashSet<int>(){
-            6,7,8,9,10
+            11,12,13,14,15,16,17,18,19
         };
 
         static HashSet<int> secondRecordsToSyncIds = new HashSet<int>(){
-            6,7,8,9,10
+            20,21,22,23,24,25,26,27
 
         };
         async public Task<APIGatewayProxyResponse> FunctionHandler(APIGatewayProxyRequest apigProxyEvent, ILambdaContext context)
@@ -93,15 +93,15 @@ namespace HelloWorld
 
                 // Read record from database and save to cache
                 Console.WriteLine("Querying for a Product");
-                var items = db.Products.Where(b => firstRecordsToSyncIds.Contains(b.ProductId));
                 var WriteToRedisTasks = new List<Task<bool>>();
+                var items = db.Products.Where(b => firstRecordsToSyncIds.Contains(b.ProductId));
 
                 foreach (var item in items)
                 {
                     WriteToRedisTasks.Add(
                         cache.StringSetAsync("Product:" + item.ProductId, JsonConvert.SerializeObject(item))
                     );
-                    Console.WriteLine(String.Format("Write Product:{0} to Redis", item.ProductId));
+                    Console.WriteLine(String.Format("Write Product:{0} From Database to Redis", item.ProductId));
                 }
                 await Task.WhenAll(WriteToRedisTasks);
 
@@ -127,23 +127,18 @@ namespace HelloWorld
 
                 // db.ChangeTracker.Clear();
 
-                foreach (var record in secondRecordsToSyncIds)
+                foreach (var recordId in secondRecordsToSyncIds)
                 {
                     var ProductFromCache = JsonConvert.DeserializeObject<Product>(
-                        await cache.StringGetAsync(String.Format("Product:{0}", record.ToString())));
+                        await cache.StringGetAsync(String.Format("Product:{0}", recordId)));
                     // Console.WriteLine(JsonConvert.SerializeObject(ProductFromCache));
-                    Console.WriteLine(String.Format("Write Product:{0} to Database", ProductFromCache.ProductId));
+                    Console.WriteLine(String.Format("Write Product:{0} from Redis to Database", ProductFromCache.ProductId));
 
                     db.Update(ProductFromCache);
                 }
                 var numOfRecordsUpdates = await db.SaveChangesAsync();
                 // Update
             }
-
-            // Delete
-            // Console.WriteLine("Delete the Product");
-            // db.Remove(Product);
-            // db.SaveChanges();
 
 
             return new APIGatewayProxyResponse
