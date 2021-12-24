@@ -90,7 +90,7 @@ namespace HelloWorld
         async public Task<APIGatewayProxyResponse> FunctionHandler(APIGatewayProxyRequest apigProxyEvent, ILambdaContext context)
         {
             {
-                IntializeData();
+                // IntializeData();ß
                 // Note: This sample requires the database to be created before running.
                 // Create
                 /*
