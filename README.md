@@ -24,8 +24,9 @@ We are going to run .NET Redis clients on AWS Lambda. The Lambda Function will b
 -----------+-------------+----------------------+-----------------+-------
         22 | iPhone 13   | Your new superpower. |            3000 |   500
 (1 row)
+```
+```
 ➜  redis-cli -h $REDIS_ENDPOINT -c GET "Product:22" | jq 
-
 {
   "ProductId": 22,
   "ProductName": "iPhone 13",
@@ -35,11 +36,11 @@ We are going to run .NET Redis clients on AWS Lambda. The Lambda Function will b
 }
 ```
 #### Invoking Lambda 
-```Invocation result for arn:aws:lambda:us-west-2:091550601287:function:helloredis-app-HelloWorldFunction-SfgLy8RyVqVt
+```
+Invocation result for arn:aws:lambda:us-west-2:091550601287:function:helloredis-app-HelloWorldFunction-SfgLy8RyVqVt
 Logs:
 START RequestId: 3e6c3770-fa77-4b58-a762-ed397a25f696 Version: $LATEST
 END RequestId: 3e6c3770-fa77-4b58-a762-ed397a25f696
-REPORT RequestId: 3e6c3770-fa77-4b58-a762-ed397a25f696	Duration: 3841.56 ms	Billed Duration: 4419 ms	Memory Size: 512 MB	Max Memory Used: 136 MB	Init Duration: 576.89 ms	
 ```
 #### After Invoking Lambda, QuantityInStock is 2000 in Database and Redis
 ```
@@ -61,6 +62,8 @@ REPORT RequestId: 3e6c3770-fa77-4b58-a762-ed397a25f696	Duration: 3841.56 ms	Bill
 -----------+-------------+----------------------+-----------------+-------
         11 | iPhone 12   | Blast past fast.     |             100 |   400
 (1 row)
+```
+```
 ➜  redis-cli -h $REDIS_ENDPOINT -c GET "Product:11" | jq 
 
 {
@@ -72,7 +75,8 @@ REPORT RequestId: 3e6c3770-fa77-4b58-a762-ed397a25f696	Duration: 3841.56 ms	Bill
 }
 ```
 #### Invoking Lambda 
-```Invocation result for arn:aws:lambda:us-west-2:091550601287:function:helloredis-app-HelloWorldFunction-SfgLy8RyVqVt
+```
+Invocation result for arn:aws:lambda:us-west-2:091550601287:function:helloredis-app-HelloWorldFunction-SfgLy8RyVqVt
 ```
 #### After Invoking Lambda, Price is 400 in Redis
 ```
@@ -101,11 +105,23 @@ https://aws.amazon.com/tw/premiumsupport/knowledge-center/elasticache-redis-keys
 - If we have one long running client to watch the Pub/Sub Channel, it is not reliable. If the client (or underlying infra) failed, the key space message from Redis is lost. To avoid missing the message, two or more long running clients will be required.  
 - On the other hand, it might not be desired for our use cases. For example, the `QuantityInStock` field for a popular item is updated 200 times per second. It is not reasonable to replay the 200 req/sec to database server.  
 - If we don't accept stale or outdated data for any reason, the client should request data from redis - the authoritative data source (source of the record) instead. 
-- If the data in Redis does change frequently, say records is updated once per day, we would not choose to have one or two (for HA purpose) long running compute resource to connect with Redis and listen to change stream.    
+- If the data in Redis does change frequently, say records are updated once per day, we would not choose to have one, or two (for HA purpose) long running compute resource to connect with Redis and listen to change stream.
+
+#### 3. How about Detect Changes in Database?
+- For example, if `UPDATE Customers
+SET ContactName = 'Alfred Schmidt', City= 'Frankfurt'
+WHERE CustomerID = 1` it is possible. 
+- On the other hand, `UPDATE Customers
+SET ContactName='Juan'
+WHERE Country='Mexico'` We don't know the primary IDs to sync changes in cache.  
 
 ### Performance Considerations
-- How about 1 millions records to update? 
+- How about 100,000 records from cache to update in database? How to do parallel processing? 
 
+### Other References 
+
+[1] https://stackoverflow.com/questions/67564361/auto-syncing-for-keys-in-apache-geode
+[2] https://github.com/VahidN/EFCoreSecondLevelCacheInterceptor
 
 ### TODO
 
