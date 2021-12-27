@@ -179,13 +179,7 @@ Write Product:11 From Database to Redis
 7) "Price"
 8) "400"
 
-➜  redis-cli -h $REDIS_ENDPOINT -c HINCRBY UsingHash:Product:12 QuantityInStock 100
-(integer) 200
-➜  redis-cli -h $REDIS_ENDPOINT -c HINCRBY UsingHash:Product:12 QuantityInStock 100
-(integer) 300
-➜  redis-cli -h $REDIS_ENDPOINT -c HINCRBY UsingHash:Product:12 QuantityInStock 100
 redis-cli -h $REDIS_ENDPOINT -c HGET UsingHash:Product:12 QuantityInStock
-
 (integer) 400
 "400"
 ``` 
