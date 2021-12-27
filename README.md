@@ -95,17 +95,18 @@ Invocation result for arn:aws:lambda:us-west-2:091550601287:function:helloredis-
 ### Questions
 
 #### 1. Why store the .NET Object as JSON String in Redis? 
-- It is generic. It is possible to customize based on the business requirement. 
+- It is generic and easier to implement. It is possible to customize based on the business requirement. 
 - For example, if `QuantityInStock` is updated very frequently, you can use patterns such as `"Product:12:QuantityInStock` so that doing decrement operations will be faster. 
-- On the other hand, if the table has 50 columns, it might not be practical to use such naming pattern for all columns, i.e. `Product:12:ProductName`, `Product:12:Description`, `Product:12:ImageUrl`, `Product:12:Dimension`... etc. If is it designed that way, getting a record from cache will need making 50 `GET` calls instead of single one. 
+- On the other hand, if the table has 50 columns, it might not be practical to use such naming pattern for all columns, i.e. `Product:12:ProductName`, `Product:12:Description`, `Product:12:ImageUrl`, `Product:12:Dimension`... etc. If is it designed that way, getting a record from cache will need making 50 `GET` calls instead of single one.
+- Using Hash in Redis is another option that can be considered.   
 
 #### 2. Why call the Lambda function on every 15 min and the watched set instead of watching the changes on Redis and Database?  
 - Watching the changes on the Redis: It is possible to use a long running Redis client using subscribe to PubSub channels. (
 https://aws.amazon.com/tw/premiumsupport/knowledge-center/elasticache-redis-keyspace-notifications/)
 - If we have one long running client to watch the Pub/Sub Channel, it is not reliable. If the client (or underlying infra) failed, the key space message from Redis is lost. To avoid missing the message, two or more long running clients will be required.  
-- On the other hand, it might not be desired for our use cases. For example, the `QuantityInStock` field for a popular item is updated 200 times per second. It is not reasonable to replay the 200 req/sec to database server.  
+- Also it is complex to track which items were modified and clear the item from the queue after writing back to Database. 
+- On the other hand, it might not be desired for our use cases. For example, the `QuantityInStock` field for a popular item is updated 200 times per second. It is not reasonable to replay the 200 req/sec to database server. 
 - If we don't accept stale or outdated data for any reason, the client should request data from redis - the authoritative data source (source of the record) instead. 
-- If the data in Redis does change frequently, say records are updated once per day, we would not choose to have one, or two (for HA purpose) long running compute resource to connect with Redis and listen to change stream.
 
 #### 3. How about Detect Changes in Database?
 - For example, if `UPDATE Customers
@@ -113,10 +114,11 @@ SET ContactName = 'Alfred Schmidt', City= 'Frankfurt'
 WHERE CustomerID = 1` it is possible. 
 - On the other hand, `UPDATE Customers
 SET ContactName='Juan'
-WHERE Country='Mexico'` We don't know the primary IDs to sync changes in cache.  
+WHERE Country='Mexico'` We don't know the primary keys to sync changes in cache.  
 
 ### Performance Considerations
-- How about 100,000 records from cache to update in database? How to do parallel processing? 
+
+- How about 100,000 records or more from cache to update in database? How to do parallel processing? 
 
 ### Other References 
 
