@@ -36,15 +36,48 @@ We are going to run .NET Redis clients on AWS Lambda. The Lambda Function will b
 }
 ```
 #### Invoking Lambda 
+
+The C# code snippet perform the tasks - read from database and write to redis
+```
+            {
+                // Read record from database and save to cache
+                var WriteToRedisTasks = new List<Task<bool>>();
+
+                // Get the product objects to sync from the database 
+                var items = db.Products.Where(b => firstRecordsToSyncIds.Contains(b.ProductId));
+
+                // Write the data into Redis cache
+                foreach (var item in items)
+                {
+                    WriteToRedisTasks.Add(
+                        cache.StringSetAsync("Product:" + item.ProductId, JsonConvert.SerializeObject(item))
+                    );
+                    Console.WriteLine(String.Format("Write Product:{0} From Database to Redis", item.ProductId));
+                }
+                await Task.WhenAll(WriteToRedisTasks);
+
+                db.ChangeTracker.Clear();
+
+            }
+```
+
+Invoking the Lambda function...
 ```
 Invocation result for arn:aws:lambda:us-west-2:091550601287:function:helloredis-app-HelloWorldFunction-SfgLy8RyVqVt
-Logs:
 START RequestId: 3e6c3770-fa77-4b58-a762-ed397a25f696 Version: $LATEST
+....
+Write Product:20 from Redis to Database
+Write Product:21 from Redis to Database
+Write Product:22 from Redis to Database
+Write Product:23 from Redis to Database
+Write Product:24 from Redis to Database
+Write Product:25 from Redis to Database
+...
 END RequestId: 3e6c3770-fa77-4b58-a762-ed397a25f696
 ```
 #### After Invoking Lambda, QuantityInStock is 2000 in Database and Redis
 ```
-➜  hello-redis git:(master) ✗ psql -h $DB_ENDPIINT -U postgres -d postgres -c "SELECT * FROM \"Products\" WHERE  \"ProductId\" = 22"
+➜  psql -h $DB_ENDPIINT -U postgres -d postgres -c "SELECT * FROM \"Products\" WHERE  \"ProductId\" = 22"
 
  ProductId | ProductName |     Description      | QuantityInStock | Price 
 -----------+-------------+----------------------+-----------------+-------
@@ -75,8 +108,41 @@ END RequestId: 3e6c3770-fa77-4b58-a762-ed397a25f696
 }
 ```
 #### Invoking Lambda 
+
+The C# code snippet perform the tasks - read data from Redis and write to database
+
+```
+            {
+                foreach (var recordId in secondRecordsToSyncIds)
+                {
+                    // Read data from Redis cache and convert to .NET Objects 
+                    var ProductFromCache = JsonConvert.DeserializeObject<Product>(
+                        await cache.StringGetAsync(String.Format("Product:{0}", recordId)));
+                    // Update the datbase
+                    db.Update(ProductFromCache);
+                    Console.WriteLine(String.Format("Write Product:{0} from Redis to Database", ProductFromCache.ProductId));
+                }
+
+                // Save changes to the database
+                var numOfRecordsUpdates = await db.SaveChangesAsync();
+            }
+  ```
+
 ```
 Invocation result for arn:aws:lambda:us-west-2:091550601287:function:helloredis-app-HelloWorldFunction-SfgLy8RyVqVt
+
+...
+Write Product:12 From Database to Redis
+Write Product:13 From Database to Redis
+Write Product:14 From Database to Redis
+Write Product:15 From Database to Redis
+Write Product:16 From Database to Redis
+Write Product:17 From Database to Redis
+Write Product:18 From Database to Redis
+Write Product:19 From Database to Redis
+Write Product:11 From Database to Redis
+...
+
 ```
 #### After Invoking Lambda, Price is 400 in Redis
 ```
@@ -96,19 +162,45 @@ Invocation result for arn:aws:lambda:us-west-2:091550601287:function:helloredis-
 
 #### 1. Why store the .NET Object as JSON String in Redis? 
 - It is generic and easier to implement. It is possible to customize based on the business requirement. 
-- For example, if `QuantityInStock` is updated very frequently, you can use patterns such as `"Product:12:QuantityInStock` so that doing decrement operations will be faster. 
-- On the other hand, if the table has 50 columns, it might not be practical to use such naming pattern for all columns, i.e. `Product:12:ProductName`, `Product:12:Description`, `Product:12:ImageUrl`, `Product:12:Dimension`... etc. If is it designed that way, getting a record from cache will need making 50 `GET` calls instead of single one.
-- Using Hash in Redis is another option that can be considered.   
+- For example, if `QuantityInStock` is updated very frequently, you can use Hash such as `"Product:12` with field name `QuantityInStock` so that doing decrement operations will be faster. 
+- Using Hash in Redis is another option that can be considered. We need find libraries to read from Redis and convert it to a .NET object also it might not as fast as JSON strings.  
+```
+➜  redis-cli -h $REDIS_ENDPOINT -c HSET UsingHash:Product:12 ProductName 'iPhone 12' Description 'Blast past fast.' 'QuantityInStock' 100 Price 400
+
+(integer) 4
+➜  redis-cli -h $REDIS_ENDPOINT -c HGETALL UsingHash:Product:12
+
+1) "ProductName"
+2) "iPhone 12"
+3) "Description"
+4) "Blast past fast."
+5) "QuantityInStock"
+6) "100"
+7) "Price"
+8) "400"
+
+➜  redis-cli -h $REDIS_ENDPOINT -c HINCRBY UsingHash:Product:12 QuantityInStock 100
+(integer) 200
+➜  redis-cli -h $REDIS_ENDPOINT -c HINCRBY UsingHash:Product:12 QuantityInStock 100
+(integer) 300
+➜  redis-cli -h $REDIS_ENDPOINT -c HINCRBY UsingHash:Product:12 QuantityInStock 100
+redis-cli -h $REDIS_ENDPOINT -c HGET UsingHash:Product:12 QuantityInStock
+
+(integer) 400
+"400"
+``` 
 
 #### 2. Why call the Lambda function on every 15 min and the watched set instead of watching the changes on Redis and Database?  
 - Watching the changes on the Redis: It is possible to use a long running Redis client using subscribe to PubSub channels. (
 https://aws.amazon.com/tw/premiumsupport/knowledge-center/elasticache-redis-keyspace-notifications/)
-- If we have one long running client to watch the Pub/Sub Channel, it is not reliable. If the client (or underlying infra) failed, the key space message from Redis is lost. To avoid missing the message, two or more long running clients will be required.  
-- Also it is complex to track which items were modified and clear the item from the queue after writing back to Database. 
-- On the other hand, it might not be desired for our use cases. For example, the `QuantityInStock` field for a popular item is updated 200 times per second. It is not reasonable to replay the 200 req/sec to database server. 
-- If we don't accept stale or outdated data for any reason, the client should request data from redis - the authoritative data source (source of the record) instead. 
+- If we have one long running client to watch the Pub/Sub Channel, it is not reliable. If the client (or underlying infra) failed, the key space message from Redis is lost. To avoid missing the change, two or more long running clients will be required to subscribe.  
+- Also it is more complex to track which items were modified and clear the item from the queue after writing back to Database. 
+- On the other hand, it might not be desired for common use cases. For example, the `QuantityInStock` field for a popular item is updated 200 times per second. It is not reasonable to replay the 200 req/sec to database server. 
+- If we don't accept stale or outdated data for any reason, the client should request data from redis - the authoritative data source (source of the record) instead using API call. 
 
 #### 3. How about Detect Changes in Database?
+
+- It is not possible to simply use audit trails in the database.
 - For example, if `UPDATE Customers
 SET ContactName = 'Alfred Schmidt', City= 'Frankfurt'
 WHERE CustomerID = 1` it is possible. 
@@ -118,12 +210,14 @@ WHERE Country='Mexico'` We don't know the primary keys to sync changes in cache.
 
 ### Performance Considerations
 
-- How about 100,000 records or more from cache to update in database? How to do parallel processing? 
+- How about 1,000,000 records or more from cache to update in database? How to do parallel processing? 
 
 ### Other References 
 
 [1] https://stackoverflow.com/questions/67564361/auto-syncing-for-keys-in-apache-geode
 [2] https://github.com/VahidN/EFCoreSecondLevelCacheInterceptor
+[3] https://docs.aws.amazon.com/dms/latest/userguide/CHAP_Target.Redis.html
+[4] https://aws.amazon.com/blogs/database/replicate-your-data-from-amazon-aurora-mysql-to-amazon-elasticache-for-redis-using-aws-dms/
 
 ### TODO
 

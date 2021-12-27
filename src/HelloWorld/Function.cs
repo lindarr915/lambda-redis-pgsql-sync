@@ -78,9 +78,9 @@ namespace HelloWorld
         {
             var p = db.Products.Where(b => b.ProductId == 11).Single();
             p.ProductName = "iPhone 12";
-            p.Description ="Blast past fast.";
-            p.Price=500;
-            p.QuantityInStock=100;
+            p.Description = "Blast past fast.";
+            p.Price = 500;
+            p.QuantityInStock = 100;
 
             db.Update(p);
             db.SaveChanges();
@@ -104,12 +104,15 @@ namespace HelloWorld
                 });
                 await db.SaveChangesAsync();
                 */
-
+            }
+            {
                 // Read record from database and save to cache
-                Console.WriteLine("Querying for a Product");
                 var WriteToRedisTasks = new List<Task<bool>>();
+
+                // Get the product objects to sync from the database 
                 var items = db.Products.Where(b => firstRecordsToSyncIds.Contains(b.ProductId));
 
+                // Write the data into Redis cache
                 foreach (var item in items)
                 {
                     WriteToRedisTasks.Add(
@@ -122,8 +125,6 @@ namespace HelloWorld
                 db.ChangeTracker.Clear();
 
             }
-
-            {
                 // Reading object from Redis cache
                 /*
                 Parallel.ForEach(secondRecordsToSyncIds, async (record) => 
@@ -141,17 +142,19 @@ namespace HelloWorld
 
                 // db.ChangeTracker.Clear();
 
+            {
                 foreach (var recordId in secondRecordsToSyncIds)
                 {
+                    // Read data from Redis cache and convert to .NET Objects 
                     var ProductFromCache = JsonConvert.DeserializeObject<Product>(
                         await cache.StringGetAsync(String.Format("Product:{0}", recordId)));
-                    // Console.WriteLine(JsonConvert.SerializeObject(ProductFromCache));
-                    Console.WriteLine(String.Format("Write Product:{0} from Redis to Database", ProductFromCache.ProductId));
-
+                    // Update the datbase
                     db.Update(ProductFromCache);
+                    Console.WriteLine(String.Format("Write Product:{0} from Redis to Database", ProductFromCache.ProductId));
                 }
+
+                // Save changes to the database
                 var numOfRecordsUpdates = await db.SaveChangesAsync();
-                // Update
             }
 
 
