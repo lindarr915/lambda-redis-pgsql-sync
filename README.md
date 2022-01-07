@@ -37,29 +37,26 @@ We are going to run .NET Redis clients on AWS Lambda. The Lambda Function will b
 ```
 #### Invoking Lambda 
 
-The C# code snippet perform the tasks - read from database and write to redis
+The C# code snippet perform the tasks - read data from Redis and write to database
 ```
             {
-                // Read record from database and save to cache
-                var WriteToRedisTasks = new List<Task<bool>>();
-
-                // Get the product objects to sync from the database 
-                var items = db.Products.Where(b => firstRecordsToSyncIds.Contains(b.ProductId));
-
-                // Write the data into Redis cache
-                foreach (var item in items)
+                foreach (var recordId in secondRecordsToSyncIds)
                 {
-                    WriteToRedisTasks.Add(
-                        cache.StringSetAsync("Product:" + item.ProductId, JsonConvert.SerializeObject(item))
-                    );
-                    Console.WriteLine(String.Format("Write Product:{0} From Database to Redis", item.ProductId));
+                    // Read data from Redis cache and convert to .NET Objects 
+                    var ProductFromCache = JsonConvert.DeserializeObject<Product>(
+                        await cache.StringGetAsync(String.Format("Product:{0}", recordId)));
+                    // Update the datbase
+                    db.Update(ProductFromCache);
+                    Console.WriteLine(String.Format("Write Product:{0} from Redis to Database", ProductFromCache.ProductId));
                 }
-                await Task.WhenAll(WriteToRedisTasks);
 
-                db.ChangeTracker.Clear();
-
+                // Save changes to the database
+                var numOfRecordsUpdates = await db.SaveChangesAsync();
             }
-```
+  ```
+
+
+
 
 Invoking the Lambda function...
 ```
@@ -109,24 +106,30 @@ END RequestId: 3e6c3770-fa77-4b58-a762-ed397a25f696
 ```
 #### Invoking Lambda 
 
-The C# code snippet perform the tasks - read data from Redis and write to database
-
+The C# code snippet perform the tasks - read from database and write to redis
 ```
             {
-                foreach (var recordId in secondRecordsToSyncIds)
-                {
-                    // Read data from Redis cache and convert to .NET Objects 
-                    var ProductFromCache = JsonConvert.DeserializeObject<Product>(
-                        await cache.StringGetAsync(String.Format("Product:{0}", recordId)));
-                    // Update the datbase
-                    db.Update(ProductFromCache);
-                    Console.WriteLine(String.Format("Write Product:{0} from Redis to Database", ProductFromCache.ProductId));
-                }
+                // Read record from database and save to cache
+                var WriteToRedisTasks = new List<Task<bool>>();
 
-                // Save changes to the database
-                var numOfRecordsUpdates = await db.SaveChangesAsync();
+                // Get the product objects to sync from the database 
+                var items = db.Products.Where(b => firstRecordsToSyncIds.Contains(b.ProductId));
+
+                // Write the data into Redis cache
+                foreach (var item in items)
+                {
+                    WriteToRedisTasks.Add(
+                        cache.StringSetAsync("Product:" + item.ProductId, JsonConvert.SerializeObject(item))
+                    );
+                    Console.WriteLine(String.Format("Write Product:{0} From Database to Redis", item.ProductId));
+                }
+                await Task.WhenAll(WriteToRedisTasks);
+
+                db.ChangeTracker.Clear();
+
             }
-  ```
+```
+
 
 ```
 Invocation result for arn:aws:lambda:us-west-2:091550601287:function:helloredis-app-HelloWorldFunction-SfgLy8RyVqVt
